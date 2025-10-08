@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minerva: Hybrid Book Recommendations & Character Chatbot</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind to use Inter font and apply rounded corners -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom styles for aesthetic enhancements */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .section-box {
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* rounded-3xl */
+            padding: 2rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .book-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.15);
+        }
+        .filter-control {
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: #f9fafb;
+            cursor: pointer;
+        }
+        /* Style for the loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Ensure title truncation works correctly */
+        .truncate-container {
+            min-width: 0;
+            flex-grow: 1;
+        }
+
+        /* Chatbot specific styles */
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+            padding: 1rem;
+            border-radius: 0.75rem;
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 1.2rem;
+            margin-bottom: 0.75rem;
+        }
+        .user-message {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 0.2rem;
+        }
+        .ai-message {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+            margin-right: auto;
+            border-bottom-left-radius: 0.2rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header with Logo, Title, and Subtitle -->
+    <header class="bg-indigo-700 text-white p-6 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center space-x-4">
+            <!-- LOGO PLACEMENT: Top-Left Corner -->
+            <a href="index.html" class="flex-shrink-0">
+                <img src="../../data/logo1.png"
+                    alt="Minerva App Logo"
+                    class="h-12 w-auto rounded-md" 
+                    onerror="this.onerror=null; this.src='https://placehold.co/120x48/FCD34D/333333?text=Minerva';"
+                >
+            </a>
+            
+            <!-- Title and Subtitle -->
+            <div>
+                <h1 class="text-3xl font-bold">Minerva: Hybrid Book Recommendations</h1>
+                <p class="text-indigo-200 mt-1">Chat with characters and filter books.</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 md:p-8 space-y-12">
+
+        <!-- Fictional Character Chatbot Section -->
+        <section id="character-chatbot" class="section-box bg-green-50/50">
+            <h2 class="text-2xl font-semibold text-green-800 mb-6 border-b pb-2">Fictional Character Chatbot</h2>
+            <p class="text-gray-600 mb-6">Select a character and start a conversation. The AI will adopt their persona!</p>
+
+            <div class="flex flex-col lg:flex-row lg:space-x-8 space-y-6 lg:space-y-0">
+                
+                <!-- Character Selection and Info Panel -->
+                <div class="lg:w-1/3 p-4 bg-white rounded-xl shadow-inner border border-green-200">
+                    <label for="character-select" class="block text-lg font-medium text-green-700 mb-2">Choose Your Companion</label>
+                    <select id="character-select" onchange="handleCharacterSelection(this.value)" class="w-full filter-control bg-white text-lg font-semibold border-green-500 mb-4">
+                        <option value="none">-- Select a Character --</option>
+                        <option value="harry_potter">Harry Potter (Wizarding World)</option>
+                        <option value="percy_jackson">Percy Jackson (Camp Half-Blood)</option>
+                        <option value="katniss_everdeen">Katniss Everdeen (The Capitol)</option>
+                    </select>
+
+                    <div id="character-info" class="text-sm text-gray-500 h-16 transition-opacity duration-300 opacity-0">
+                        <!-- Character info will be displayed here -->
+                    </div>
+                </div>
+
+                <!-- Chat Window -->
+                <div class="lg:w-2/3 flex flex-col space-y-4">
+                    <div id="chat-history" class="chat-container">
+                        <p class="text-center text-gray-400 py-16">Select a character to begin chatting!</p>
+                    </div>
+
+                    <!-- Input and Send -->
+                    <div class="flex space-x-2">
+                        <input type="text" id="user-input" placeholder="Type your message..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" disabled onkeypress="if(event.key === 'Enter') sendMessage()">
+                        <button id="send-button" onclick="sendMessage()" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md disabled:opacity-50" disabled>
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Multi-Criteria Filtering System Section -->
+          <section id="multi-filter-system" class="section-box">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6 border-b pb-2">Multi-Criteria Filtering & Discovery</h2>
+            <p class="text-sm text-gray-500 mb-4">
+                Select your criteria and click **Apply Filters** to see results in the **Matching Books** section.
+            </p>
+
+            <form method="get" id="filter-form">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                    <div>
+                        <label for="mood-select" class="block text-sm font-medium text-gray-700 mb-1">Mood</label>
+                        <select id="mood-select" name="mood" class="w-full filter-control">
+                            <option value="">Any Mood</option>
+                            {% for mood in moods %}
+                            <option value="{{ mood }}" {% if selected_mood == mood %}selected{% endif %}>{{ mood }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="genre-select" class="block text-sm font-medium text-gray-700 mb-1">Genre</label>
+                        <select id="genre-select" name="genre" class="w-full filter-control">
+                            <option value="">Any Genre</option>
+                            {% for genre in genres %}
+                            <option value="{{ genre }}" {% if selected_genre == genre %}selected{% endif %}>{{ genre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="author-select" class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+                        <select id="author-select" name="author" class="w-full filter-control">
+                            <option value="">Any Author</option>
+                            {% for author in authors %}
+                            <option value="{{ author }}" {% if selected_author == author %}selected{% endif %}>{{ author }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="language-select" class="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                        <select id="language-select" name="language" class="w-full filter-control">
+                            <option value="">Any Language</option>
+                            {% for language in languages %}
+                            <option value="{{ language }}" {% if selected_language == language %}selected{% endif %}>{{ language }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="year-input" class="block text-sm font-medium text-gray-700 mb-1">Min. Year</label>
+                        <input type="number" id="year-input" name="min_year" class="w-full filter-control" placeholder="e.g., 2000" value="{{ selected_min_year }}">
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6 pt-2 space-y-4 sm:space-y-0">
+                    <button type="submit" class="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md">
+                        Apply Filters
+                    </button>
+                    <div class="flex items-center space-x-4">
+                        <label for="sort-select" class="text-sm font-medium text-gray-700">Sort By:</label>
+                        <select id="sort-select" name="sort_by" class="filter-control">
+                            <option value="rating_desc" {% if selected_sort_by == 'rating_desc' %}selected{% endif %}>Highest Rating</option>
+                            <option value="year_desc" {% if selected_sort_by == 'year_desc' %}selected{% endif %}>Newest First</option>
+                            <option value="title_asc" {% if selected_sort_by == 'title_asc' %}selected{% endif %}>Title (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Filtered Results Display -->
+            <div class="flex justify-between items-center mb-4 border-t pt-4">
+                <h3 class="text-xl font-medium text-gray-700">Matching Books (<span id="result-count">{{ books|length }}</span>)</h3>
+            </div>
+            <div id="filtered-results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {% for book in books %}
+                <div class="book-card bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg col-span-1 p-3">
+                    <div class="flex items-start space-x-3">
+                        <img src="{{ book.image_url }}" alt="{{ book.title }} cover" class="rounded-lg shadow-sm w-16 h-24 flex-shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/100x150/CCCCCC/333333?text=Book';">
+                        <div class="flex-grow min-w-0 truncate-container">
+                            <h4 class="text-base font-medium text-gray-900 truncate" title="{{ book.title }}">{{ book.title }}</h4>
+                            <p class="text-xs text-indigo-600 truncate">by {{ book.author }}</p>
+                            <div class="mt-1 flex items-center justify-start">
+                                <span class="text-yellow-500 text-sm font-bold">{{ book.average_rating }}</span>
+                                <span class="text-gray-400 text-xs ml-1">({{ book.year }})</span>
+                            </div>
+                            <p class="text-sm text-gray-700 mt-2">{{ book.description }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Hybrid Recommendations Section (Demand Forecast - BOTTOM SECTION) -->
+        <section id="hybrid-recommendations-section" class="section-box bg-indigo-50/50">
+            <h2 class="text-2xl font-semibold text-indigo-800 mb-6 border-b pb-2">Top 10 Hybrid Recommendations (Demand Forecast)</h2>
+            <p class="text-gray-600 mb-6">These are the most popular and highly-rated books based on simulated market demand and user behavior. <span class="font-bold text-red-500">This list is static and does not change based on your filters above.</span></p>
+            <div id="hybrid-recommendations" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+                <!-- Book cards will be injected here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Book Description and Details -->
+    <div id="book-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onclick="closeModal(event)">
+        <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl transition-all duration-300" onclick="event.stopPropagation()">
+            <h3 id="modal-title" class="text-2xl font-bold text-indigo-800 mb-2"></h3>
+            <p id="modal-author" class="text-lg text-gray-600 mb-4"></p>
+            <div class="flex items-center space-x-4 mb-4">
+                <span id="modal-rating" class="text-yellow-500 font-semibold flex items-center"></span>
+                <span id="modal-year" class="text-sm text-gray-500"></span>
+            </div>
+
+            <h4 class="text-base font-semibold text-gray-700 mt-4 mb-2">AI-Generated Summary:</h4>
+            <div id="modal-description" class="text-gray-700 min-h-[4rem] bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div id="description-loading" class="text-center">
+                    <div class="spinner"></div>
+                    <p class="text-sm text-gray-500 mt-2">Generating description...</p>
+                </div>
+                <p id="description-text" class="hidden"></p>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeModal()" class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- API KEY AND ENVIRONMENT CONFIGURATION (Crucial for the fix) ---
+        // !!! IMPORTANT !!! THIS MUST BE AN EMPTY STRING for the Canvas environment:
+        const API_KEY = "AIzaSyCIUPb2PC3EOwae--qFZrKELwKq57YIpKs"; 
+        const API_MODEL = 'gemini-2.5-flash-preview-05-20';
+
+        // Helper function for consistent API URL generation
+        const getApiUrl = (model = API_MODEL) => {
+            // apiKey is injected by the environment if it's an empty string.
+            return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+        };
+        // ------------------------------------------------------------------------------------------
+
+
+        // --- FIREBASE IMPORTS AND SETUP (Included for completeness, though not strictly needed for chat/summary) ---
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        // setLogLevel('debug'); // Uncomment for debugging Firebase
+
+        const initFirebase = async () => {
+            if (Object.keys(firebaseConfig).length > 0) {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Firebase Anonymous Sign-in failed:", error);
+                }
+            } else {
+                console.warn("Firebase config not available. Running in local-only mode.");
+            }
+        };
+        // ------------------------------------------------------------------------------------------
+
+        // --- CORE APPLICATION DATA (Book list and utilities) ---
+
+        const mapLanguage = (code) => {
+            switch (code) {
+                case 'eng': return 'English';
+                case 'spa': return 'Spanish';
+                case 'jpn': return 'Japanese';
+                case 'fre': return 'French';
+                default: return code;
+            }
+        };
+
+        const MASTER_BOOK_LIST = [
+            { id: 1, title: "Harry Potter and the Sorcerer's Stone", author: "J.K. Rowling", genre: "Fantasy", mood: "Whimsical", language: "eng", year: 1997, rating: 4.44, popularity_score: 950, cover: "https://placehold.co/100x150/1D4ED8/FFFFFF?text=HP1" },
+            { id: 2, title: "The Lord of the Rings: The Fellowship of the Ring", author: "J.R.R. Tolkien", genre: "Epic Fantasy", mood: "Adventurous", language: "eng", year: 1954, rating: 4.36, popularity_score: 750, cover: "https://placehold.co/100x150/F59E0B/FFFFFF?text=LOTR1" }, 
+            { id: 3, title: "The Name of the Wind", author: "Patrick Rothfuss", genre: "Epic Fantasy", mood: "Epic", language: "eng", year: 2007, rating: 4.53, popularity_score: 920, cover: "https://placehold.co/100x150/065F46/FFFFFF?text=NOTW" }, 
+            { id: 4, title: "A Good Girl's Guide to Murder", author: "Holly Jackson", genre: "Crime Thriller", mood: "Curious", language: "eng", year: 2019, rating: 4.30, popularity_score: 800, cover: "https://placehold.co/100x150/4C0D73/FFFFFF?text=GGGM" },
+            { id: 5, title: "Good Girl, Bad Blood", author: "Holly Jackson", genre: "Crime Thriller", mood: "Tense", language: "eng", year: 2020, rating: 4.40, popularity_score: 850, cover: "https://placehold.co/100x150/5B21B6/FFFFFF?text=GGBB" },
+            { id: 6, title: "As Good As Dead", author: "Holly Jackson", genre: "Crime Thriller", mood: "Tense", language: "eng", year: 2021, rating: 4.35, popularity_score: 780, cover: "https://placehold.co/100x150/9D174D/FFFFFF?text=AGAD" },
+            { id: 7, title: "Not Quite Dead Yet (Mock)", author: "Holly Jackson", genre: "Crime Thriller", mood: "Curious", language: "eng", year: 2024, rating: 4.50, popularity_score: 900, cover: "https://placehold.co/100x150/10B981/FFFFFF?text=NQDY" }, // Latest Holly Jackson mock
+            { id: 8, title: "The Martian", author: "Andy Weir", genre: "Sci-Fi", mood: "Optimistic", language: "eng", year: 2011, rating: 4.40, popularity_score: 650, cover: "https://placehold.co/100x150/14B8A6/FFFFFF?text=TM" },
+            { id: 9, title: "Educated: A Memoir", author: "Tara Westover", genre: "Non-Fiction", mood: "Inspiring", language: "eng", year: 2018, rating: 4.47, popularity_score: 780, cover: "https://placehold.co/100x150/FCD34D/333333?text=EDU" },
+            { id: 10, title: "Where the Crawdads Sing", author: "Delia Owens", genre: "Mystery", mood: "Emotional", language: "eng", year: 2018, rating: 4.30, popularity_score: 850, cover: "https://placehold.co/100x150/EC4899/FFFFFF?text=WCS" },
+            { id: 11, title: "Murder on the Orient Express", author: "Agatha Christie", genre: "Mystery", mood: "Curious", language: "eng", year: 1934, rating: 4.19, popularity_score: 700, cover: "https://placehold.co/100x150/78716C/FFFFFF?text=MOE" },
+            { id: 12, title: "The Mysterious Affair at Styles", author: "Agatha Christie", genre: "Mystery", mood: "Curious", language: "eng", year: 1920, rating: 3.99, popularity_score: 600, cover: "https://placehold.co/100x150/4B5563/FFFFFF?text=MAS" },
+            { id: 13, title: "The Green Mile", author: "Stephen King", genre: "Horror", mood: "Pensive", language: "eng", year: 1996, rating: 4.40, popularity_score: 900, cover: "https://placehold.co/100x150/6D28D9/FFFFFF?text=TGM" },
+            { id: 14, title: "It", author: "Stephen King", genre: "Horror", mood: "Scary", language: "eng", year: 1986, rating: 4.20, popularity_score: 800, cover: "https://placehold.co/100x150/312E81/FFFFFF?text=IT" },
+            { id: 15, title: "Misery", author: "Stephen King", genre: "Horror", mood: "Tense", language: "eng", year: 1987, rating: 4.10, popularity_score: 750, cover: "https://placehold.co/100x150/BE185D/FFFFFF?text=MIS" },
+            { id: 16, title: "The Martian (French)", author: "Andy Weir", genre: "Sci-Fi", mood: "Optimistic", language: "fre", year: 2011, rating: 4.40, popularity_score: 650, cover: "https://placehold.co/100x150/374151/FFFFFF?text=TM+FR" },
+        ];
+
+
+        // --- UTILITY FUNCTIONS (Book card, filters) ---
+
+        /**
+         * Gets unique values from the book list for populating dropdown filters.
+         */
+        const getUniqueValues = (key) => {
+            const values = MASTER_BOOK_LIST.map(book => (book[key] || "").trim()).filter(Boolean);
+            let uniqueValues = [...new Set(values)];
+            
+            if (key === 'language') {
+                uniqueValues = uniqueValues.map(code => ({ code, name: mapLanguage(code) }));
+                return uniqueValues.sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            return uniqueValues.sort();
+        };
+
+        /**
+         * Converts book data into an HTML card string.
+         */
+        const createBookCard = (book, isLarge = false) => {
+            const sizeClasses = isLarge ? 'col-span-1 p-4' : 'col-span-1 p-3';
+            const textClasses = isLarge ? 'text-lg font-semibold' : 'text-base font-medium';
+            const subtitleClasses = isLarge ? 'text-sm' : 'text-xs';
+
+            return `
+                <div class="book-card bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg ${sizeClasses}" data-book-id="${book.id}" onclick="showBookDetailsModal(${book.id})">
+                    <div class="flex ${isLarge ? 'flex-col items-center' : 'items-start space-x-3'}">
+                        <img src="${book.cover}" alt="${book.title} cover" class="rounded-lg shadow-sm ${isLarge ? 'w-24 h-36 mb-3' : 'w-16 h-24 flex-shrink-0'}" onerror="this.onerror=null; this.src='https://placehold.co/100x150/CCCCCC/333333?text=Book';">
+                        <!-- Truncation applied via Tailwind 'truncate' class on title/author -->
+                        <div class="${isLarge ? 'text-center w-full truncate-container' : 'flex-grow min-w-0 truncate-container'}">
+                            <h4 class="${textClasses} text-gray-900 truncate" title="${book.title}">${book.title}</h4>
+                            <p class="${subtitleClasses} text-indigo-600 truncate">by ${book.author}</p>
+                            <div class="mt-1 flex items-center ${isLarge ? 'justify-center' : 'justify-start'}">
+                                <span class="text-yellow-500 text-sm font-bold">${book.rating.toFixed(2)}</span>
+                                <span class="text-gray-400 text-xs ml-1">(${book.year})</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        /**
+         * Populates the filter dropdowns with unique values.
+         */
+        const populateFilters = () => {
+            const filters = [
+                { id: 'mood-select', key: 'mood', defaultOption: '<option value="">Any Mood</option>' },
+                { id: 'genre-select', key: 'genre', defaultOption: '<option value="">Any Genre</option>' },
+                { id: 'author-select', key: 'author', defaultOption: '<option value="">Any Author</option>' },
+                { id: 'language-select', key: 'language', defaultOption: '<option value="">Any Language</option>' }
+            ];
+
+            filters.forEach(filter => {
+                const selectElement = document.getElementById(filter.id);
+                const uniqueValues = getUniqueValues(filter.key);
+
+                if (selectElement) {
+                    // Clear existing options and add default
+                    selectElement.innerHTML = filter.defaultOption;
+                    if (filter.key === 'language') {
+                        uniqueValues.forEach(item => {
+                            selectElement.innerHTML += `<option value="${item.code}">${item.name}</option>`;
+                        });
+                    } else {
+                        uniqueValues.forEach(value => {
+                            selectElement.innerHTML += `<option value="${value}">${value}</option>`;
+                        });
+                    }
+                }
+            });
+        };
+
+        /**
+         * Filters and sorts the book list based on current filter control values.
+         */
+        window.applyFilters = () => {
+            const mood = document.getElementById('mood-select').value.trim().toLowerCase();
+            const genre = document.getElementById('genre-select').value.trim().toLowerCase();
+            const author = document.getElementById('author-select').value.trim().toLowerCase();
+            const language = document.getElementById('language-select').value.trim().toLowerCase();
+
+            const minYearStr = document.getElementById('year-input').value;
+            const minYear = minYearStr ? parseInt(minYearStr, 10) : 0;
+            const sortBy = document.getElementById('sort-select').value;
+
+            let filteredList = MASTER_BOOK_LIST.filter(book => {
+                const bookMood = book.mood ? book.mood.trim().toLowerCase() : "";
+                const bookGenre = book.genre ? book.genre.trim().toLowerCase() : "";
+                const bookAuthor = book.author ? book.author.trim().toLowerCase() : "";
+                const bookLanguage = book.language ? book.language.trim().toLowerCase() : "";
+
+                const passesMood = !mood || (bookMood === mood);
+                const passesGenre = !genre || (bookGenre === genre);
+                const passesAuthor = !author || (bookAuthor === author);
+                const passesLanguage = !language || (bookLanguage === language);
+                const passesYear = book.year >= minYear;
+
+                return passesMood && passesGenre && passesAuthor && passesLanguage && passesYear;
+            });
+            
+            // Apply sorting
+            filteredList.sort((a, b) => {
+                if (sortBy === 'rating_desc') {
+                    return b.rating - a.rating;
+                } else if (sortBy === 'year_desc') {
+                    return b.year - a.year;
+                } else if (sortBy === 'title_asc') {
+                    return a.title.localeCompare(b.title);
+                }
+                return 0;
+            });
+
+            renderFilteredResults(filteredList);
+        };
+
+        /**
+         * Renders the filtered list of books into the results container.
+         */
+        const renderFilteredResults = (books) => {
+            const container = document.getElementById('filtered-results');
+            const resultCount = document.getElementById('result-count');
+            const noResults = document.getElementById('no-results');
+            
+            resultCount.textContent = books.length;
+
+            // CRITICAL DOM Check for better debugging
+            if (!container || !resultCount || !noResults) {
+                console.error("CRITICAL ERROR: One or more filtering DOM elements are missing.");
+                console.error(`Missing Element ID: ${!container ? 'filtered-results' : !resultCount ? 'result-count' : 'no-results'}`);
+                return;
+            }
+
+            if (books.length === 0) {
+                container.innerHTML = '';
+                noResults.classList.remove('hidden');
+                return;
+            }
+
+            noResults.classList.add('hidden');
+            container.innerHTML = books.map(book => createBookCard(book, false)).join('');
+        };
+
+        /**
+         * Displays the top 10 books based on a simulated "popularity_score" (demand forecast).
+         */
+        const displayHybridRecommendations = () => {
+            const topBooks = MASTER_BOOK_LIST
+                .sort((a, b) => b.popularity_score - a.popularity_score)
+                .slice(0, 10); 
+
+            const container = document.getElementById('hybrid-recommendations');
+            if (container) {
+                 container.innerHTML = topBooks.map(book => createBookCard(book, true)).join('');
+            }
+        };
+
+
+        // --- GEMINI API INTEGRATION (For Book Summary) ---
+
+        const MAX_RETRIES = 3;
+
+        /**
+         * Calls the Gemini API to get a grounded description of the book.
+         */
+        const callGeminiApiForDescription = async (bookTitle, bookAuthor) => {
+            const loadingDiv = document.getElementById('description-loading');
+            const descriptionText = document.getElementById('description-text');
+            
+            if (!loadingDiv || !descriptionText) return;
+
+            loadingDiv.classList.remove('hidden');
+            descriptionText.classList.add('hidden');
+            descriptionText.textContent = ''; 
+
+            const userQuery = `Find and summarize the plot and critical reception of the book "${bookTitle}" by ${bookAuthor}. Keep the summary concise (max 4 sentences).`;
+            const systemPrompt = "You are a literary critic. Provide a concise, well-written, single-paragraph summary of the requested book, focusing on the plot and reception. Only use information you can verify with Google Search.";
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            const options = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            };
+
+            let responseText = `Error: Could not generate summary. Check API access.`;
+
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(getApiUrl(), options);
+
+                    if (!response.ok) {
+                        // Handle rate limiting (429) or overloaded service (503) by retrying
+                        if ((response.status === 429 || response.status === 503) && i < MAX_RETRIES - 1) {
+                            const delay = Math.pow(2, i) * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        const errorJson = await response.json().catch(() => ({ message: "Could not parse error response." }));
+                        responseText = `API Error (${response.status}): ${errorJson.error?.message || "Unknown error."}`;
+                        break;
+                    }
+                    
+                    const result = await response.json();
+                    if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        responseText = result.candidates[0].content.parts[0].text;
+                        break;
+                    }
+
+                } catch (error) {
+                    responseText = `CRITICAL FAILURE: Network error. Reason: ${error.message}`;
+                    break;
+                }
+            }
+
+            descriptionText.textContent = responseText;
+            loadingDiv.classList.add('hidden');
+            descriptionText.classList.remove('hidden');
+        };
+
+
+        // --- MODAL CONTROL ---
+
+        /**
+         * Opens the modal and displays book details, initiating the API call for summary.
+         */
+        window.showBookDetailsModal = (bookId) => {
+            const book = MASTER_BOOK_LIST.find(b => b.id === bookId);
+            if (!book) return;
+
+            document.getElementById('modal-title').textContent = book.title;
+            document.getElementById('modal-author').textContent = `By ${book.author}`;
+            document.getElementById('modal-rating').innerHTML = `
+                <svg class="w-4 h-4 fill-current mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M10 15l-5.878 3.09 1.123-6.545L.487 7.21l6.564-.955L10 1l2.949 5.255 6.564.955-4.758 4.335 1.123 6.545z"/>
+                </svg>
+                ${book.rating.toFixed(2)}
+            `;
+            document.getElementById('modal-year').textContent = `Published: ${book.year}`;
+            document.getElementById('book-modal').classList.remove('hidden');
+
+            // Reset description area before calling API
+            document.getElementById('description-text').classList.add('hidden');
+            document.getElementById('description-loading').classList.remove('hidden');
+
+            callGeminiApiForDescription(book.title, book.author);
+        };
+
+        /**
+         * Closes the modal.
+         */
+        window.closeModal = (event) => {
+            if (event && event.target.id !== 'book-modal') return; 
+            document.getElementById('book-modal').classList.add('hidden');
+        };
+
+
+        // --- CHARACTER CHATBOT LOGIC (Fully integrated with robust API call) ---
+
+        const CHARACTERS = {
+            harry_potter: {
+                name: "Harry Potter",
+                series: "The Wizarding World (Harry Potter)",
+                description: "The Boy Who Lived. Ask him about Hogwarts, Quidditch, or the next Defense Against the Dark Arts class!",
+                systemPrompt: "You are Harry Potter. Respond in the voice of Harry Potter. Use British terminology and references to the Wizarding World (Hogwarts, spells, house rivalry). Be brave, sometimes reckless, and loyal. Keep your answers concise, ideally one or two paragraphs.",
+            },
+            percy_jackson: {
+                name: "Percy Jackson",
+                series: "Camp Half-Blood (Percy Jackson & The Olympians)",
+                description: "Son of Poseidon and savior of Olympus. Ask him about camp, the gods, or his next quest. Just don't mention homework.",
+                systemPrompt: "You are Percy Jackson, a demigod son of Poseidon. Respond in the voice of Percy Jackson. Be witty, sarcastic, slightly lazy, but ultimately loyal and heroic. Use American casual language and reference Camp Half-Blood, Greek mythology, and the gods. Keep your answers concise, ideally one or two paragraphs.",
+            },
+            katniss_everdeen: {
+                name: "Katniss Everdeen",
+                series: "The Capitol (The Hunger Games)",
+                description: "The Girl on Fire. Ask her about District 12, hunting, or the meaning of the Mockingjay. She's cautious and protective.",
+                systemPrompt: "You are Katniss Everdeen. Respond in the voice of Katniss Everdeen. Be cautious, protective of your loved ones, reluctant to be a symbol, and focused on survival. Use direct, pragmatic language and reference District 12, hunting, and the Capitol. Keep your answers concise, ideally one or two paragraphs.",
+            }
+        };
+
+        let selectedCharacter = null;
+        let chatHistory = [];
+        const CHAT_MAX_RETRIES = 5; 
+
+
+        /**
+         * Updates the UI and state when a character is selected.
+         */
+        window.handleCharacterSelection = (characterKey) => {
+            const chatHistoryEl = document.getElementById('chat-history');
+            const characterInfoEl = document.getElementById('character-info');
+            const userInputEl = document.getElementById('user-input');
+            const sendButtonEl = document.getElementById('send-button');
+
+            if (characterKey === 'none') {
+                selectedCharacter = null;
+                chatHistory = [];
+                chatHistoryEl.innerHTML = '<p class="text-center text-gray-400 py-16">Select a character to begin chatting!</p>';
+                characterInfoEl.innerHTML = '';
+                characterInfoEl.classList.remove('opacity-100');
+                userInputEl.disabled = true;
+                sendButtonEl.disabled = true;
+            } else {
+                selectedCharacter = CHARACTERS[characterKey];
+                chatHistory = []; 
+                chatHistoryEl.innerHTML = `<p class="text-center text-gray-500 py-4">You are now chatting with <span class="font-bold">${selectedCharacter.name}</span>. Say hello!</p>`;
+                characterInfoEl.innerHTML = `<p class="font-semibold">${selectedCharacter.name}</p><p>${selectedCharacter.description}</p>`;
+                characterInfoEl.classList.add('opacity-100');
+                userInputEl.disabled = false;
+                sendButtonEl.disabled = false;
+                userInputEl.focus();
+            }
+        };
+
+        /**
+         * Adds a message to the chat history and scrolls to the bottom.
+         */
+        const appendMessage = (sender, text) => {
+            const chatHistoryEl = document.getElementById('chat-history');
+            
+            // Clear initial message on first real message
+            if (chatHistory.length === 0 && sender !== 'system') { 
+                const infoText = chatHistoryEl.querySelector('p');
+                if(infoText && infoText.textContent.includes('You are now chatting')) {
+                     chatHistoryEl.innerHTML = ''; 
+                }
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message-bubble', sender === 'user' ? 'user-message' : 'ai-message');
+            messageDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'); 
+            chatHistoryEl.appendChild(messageDiv);
+            
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        };
+
+        /**
+         * Sends the message to the Gemini API with the character's persona and includes error handling/backoff.
+         */
+        window.sendMessage = async () => {
+            if (!selectedCharacter) return;
+
+            const userInputEl = document.getElementById('user-input');
+            const sendButtonEl = document.getElementById('send-button');
+            const userMessage = userInputEl.value.trim();
+
+            if (!userMessage) return;
+
+            // 1. Update UI for user message and lock input
+            appendMessage('user', userMessage);
+            userInputEl.value = '';
+            userInputEl.disabled = true;
+            sendButtonEl.disabled = true;
+            sendButtonEl.innerHTML = `<div class="spinner border-white border-t-indigo-200"></div>`; // Show loading spinner
+
+            // 2. Add message to internal chat history (for API payload)
+            chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+
+            const payload = {
+                contents: chatHistory,
+                // Crucial: Use the System Instruction to enforce the persona
+                systemInstruction: { parts: [{ text: selectedCharacter.systemPrompt }] },
+            };
+
+            const options = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            };
+            
+            let responseText = `Error: ${selectedCharacter.name} seems to be unavailable right now. Please try again.`;
+            
+            // 3. API Call with Exponential Backoff
+            let delay = 1000;
+            for (let i = 0; i < CHAT_MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(getApiUrl(), options);
+
+                    if (!response.ok) {
+                        // Handle 429 (Rate Limit) or 503 (Overloaded) by retrying
+                        if ((response.status === 429 || response.status === 503) && i < CHAT_MAX_RETRIES - 1) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential backoff
+                            continue; // Retry the loop
+                        }
+                        
+                        // For other final errors, capture the message
+                        const errorJson = await response.json().catch(() => ({ message: "Could not parse error response." }));
+                        responseText = `**API Error (${response.status})**: The service failed. Details: ${errorJson.error?.message || "Unknown error."}`;
+                        break;
+                    }
+                    
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+
+                    if (candidate?.content?.parts?.[0]?.text) {
+                        responseText = candidate.content.parts[0].text;
+                        break; // Success, break retry loop
+                    }
+
+                } catch (error) {
+                    responseText = `**CRITICAL FAILURE**: Network error. Reason: ${error.message}`;
+                    break;
+                }
+            }
+
+            // 4. Update UI and internal history with AI response
+            appendMessage('ai', responseText);
+            
+            // Only push successful or structured responses back to chatHistory for context continuity
+            if (!responseText.startsWith('**API Error') && !responseText.startsWith('**CRITICAL FAILURE')) {
+                 chatHistory.push({ role: 'model', parts: [{ text: responseText }] });
+            }
+            
+            // 5. Restore input state
+            sendButtonEl.innerHTML = 'Send';
+            userInputEl.disabled = false;
+            sendButtonEl.disabled = false;
+            userInputEl.focus();
+        };
+
+        // --- INITIALIZATION ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase(); 
+            
+            displayHybridRecommendations(); 
+            populateFilters(); 
+            // Display all books by default on load, then wait for explicit filter click
+            renderFilteredResults(MASTER_BOOK_LIST); 
+        });
+
+    </script>
+</body>
+</html>
