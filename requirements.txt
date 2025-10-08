@@ -1,6 +1,6 @@
-# Replace the content with versioned packages
 Flask==2.3.3
 pandas==2.0.3
 numpy==1.24.3
 scikit-learn==1.3.0
 gunicorn==21.2.0
+setuptools==65.5.0
